@@ -26,6 +26,7 @@ from . import types_pb2 as proto_types
 from bitcoinrpc.authproxy import AuthServiceProxy, JSONRPCException
 
 cache_dir = None
+urldash   = None
 
 class TxApi(object):
 
@@ -47,11 +48,12 @@ class TxApi(object):
             j = r.json()
         except:
             raise Exception('URL error: %s' % url)
-        if cache_file:
-            try: # saving into cache
-                json.dump(j, open(cachefile, 'w'))
-            except:
-                pass
+        if cache_dir:
+            if cache_file:
+                try: # saving into cache
+                    json.dump(j, open(cachefile, 'w'))
+                except:
+                    pass
         return j
 
     def get_tx(self, txhash):
@@ -65,6 +67,10 @@ class TxApiInsight(TxApi):
         self.zcash = zcash
 
     def get_tx(self, txhash):
+        global urldash
+        
+        if(urldash):
+            self.url = urldash
 
         data = self.fetch_json(self.url, 'tx', txhash)
 
@@ -188,3 +194,5 @@ TxApiBitcoin = TxApiInsight(network='insight_bitcoin', url='https://insight.bitp
 TxApiTestnet = TxApiInsight(network='insight_testnet', url='https://test-insight.bitpay.com/api/')
 TxApiSegnet = TxApiSmartbit(network='smartbit_segnet', url='https://segnet-api.smartbit.com.au/v1/blockchain/')
 TxApiZcashTestnet = TxApiInsight(network='insight_zcashtestnet', url='https://explorer.testnet.z.cash/api/', zcash=True)
+TxApiDash = TxApiInsight(network='insight_dash', url='')
+TxApiDashTestnet = TxApiInsight(network='insight_dashtestnet', url='')
