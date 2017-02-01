@@ -23,6 +23,8 @@ import requests
 import json
 from . import types_pb2 as proto_types
 
+from bitcoinrpc.authproxy import AuthServiceProxy, JSONRPCException
+
 cache_dir = None
 
 class TxApi(object):
@@ -139,6 +141,48 @@ class TxApiSmartbit(TxApi):
 
         return t
 
+# rpc ----
+rpcuser = None
+rpcpassword = None
+rpcbindip = None
+rpcport = None
+
+def get_tx_rpc(txhash):
+    global rpcuser, rpcpassword, rpcbindip, rpcport
+    serverURL = 'http://' + rpcuser + ':' + rpcpassword + '@' + rpcbindip + ':' + str(rpcport)
+    access = AuthServiceProxy(serverURL)
+
+    data = access.getrawtransaction(txhash.decode("utf-8"), 1)
+
+    t = proto_types.TransactionType()
+    t.version = data['version']
+    t.lock_time = data['locktime']
+
+    for vin in data['vin']:
+        i = t.inputs.add()
+        if 'coinbase' in vin.keys():
+            i.prev_hash = binascii.unhexlify(b'0000000000000000000000000000000000000000000000000000000000000000')
+            i.prev_index = 0xffffffff # signed int -1
+            i.script_sig = binascii.unhexlify(vin['coinbase'])
+            i.sequence = vin['sequence']
+
+        else:
+            i.prev_hash = binascii.unhexlify(vin['txid'])
+            i.prev_index = vin['vout']
+            i.script_sig = binascii.unhexlify(vin['scriptSig']['hex'])
+            i.sequence = vin['sequence']
+
+    for vout in data['vout']:
+        o = t.bin_outputs.add()
+        o.amount = int(Decimal(str(vout['value'])) * 100000000)
+        o.script_pubkey = binascii.unhexlify(vout['scriptPubKey']['hex'])
+
+    return t
+
+class TXAPIDashrpc(object):
+    def get_tx(self, txhash):
+        rpc_raw_tx = get_tx_rpc(txhash)
+        return rpc_raw_tx
 
 TxApiBitcoin = TxApiInsight(network='insight_bitcoin', url='https://insight.bitpay.com/api/')
 TxApiTestnet = TxApiInsight(network='insight_testnet', url='https://test-insight.bitpay.com/api/')
