@@ -152,10 +152,18 @@ rpcuser = None
 rpcpassword = None
 rpcbindip = None
 rpcport = None
+rpcusessl = False
 
 def get_tx_rpc(txhash):
-    global rpcuser, rpcpassword, rpcbindip, rpcport
-    serverURL = 'http://' + rpcuser + ':' + rpcpassword + '@' + rpcbindip + ':' + str(rpcport)
+    global rpcuser, rpcpassword, rpcbindip, rpcport, rpcusessl
+    if rpcusessl:
+        import ssl
+        ssl._create_default_https_context = ssl._create_unverified_context
+        serverURL = 'https://' + rpcuser + ':' + rpcpassword + '@' + rpcbindip + ':' + str(rpcport)
+    
+    else:
+        serverURL = 'http://' + rpcuser + ':' + rpcpassword + '@' + rpcbindip + ':' + str(rpcport)
+
     access = AuthServiceProxy(serverURL)
 
     data = access.getrawtransaction(txhash.decode("utf-8"), 1)
