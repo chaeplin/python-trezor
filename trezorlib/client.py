@@ -277,6 +277,8 @@ class TextUIMixin(object):
             word = raw_input()
         except NameError:
             word = input() # Python 3
+        if self.expand:
+            word = self.mnemonic_wordlist.expand_word(word)
         return proto.WordAck(word=word)
 
 class DebugLinkMixin(object):
@@ -812,7 +814,7 @@ class ProtocolMixin(object):
 
     @field('message')
     @expect(proto.Success)
-    def recovery_device(self, word_count, passphrase_protection, pin_protection, label, language, type=types.RecoveryDeviceType_ScrambledWords):
+    def recovery_device(self, word_count, passphrase_protection, pin_protection, label, language, type=types.RecoveryDeviceType_ScrambledWords, expand=False):
         if self.features.initialized:
             raise Exception("Device is initialized already. Call wipe_device() and try again.")
 
@@ -820,6 +822,12 @@ class ProtocolMixin(object):
             raise Exception("Invalid word count. Use 12/18/24")
 
         self.recovery_matrix_first_pass = True
+
+        self.expand = expand
+        if self.expand:
+            # optimization to load the wordlist once, instead of for each recovery word
+            self.mnemonic_wordlist = Mnemonic('english')
+
         res = self.call(proto.RecoveryDevice(word_count=int(word_count),
                                    passphrase_protection=bool(passphrase_protection),
                                    pin_protection=bool(pin_protection),
@@ -858,16 +866,20 @@ class ProtocolMixin(object):
 
     @field('message')
     @expect(proto.Success)
-    def load_device_by_mnemonic(self, mnemonic, pin, passphrase_protection, label, language, skip_checksum=False):
-        m = Mnemonic('english')
-        if not skip_checksum and not m.check(mnemonic):
-            raise Exception("Invalid mnemonic checksum")
-
+    def load_device_by_mnemonic(self, mnemonic, pin, passphrase_protection, label, language, skip_checksum=False, expand=False):
         # Convert mnemonic to UTF8 NKFD
         mnemonic = Mnemonic.normalize_string(mnemonic)
 
         # Convert mnemonic to ASCII stream
         mnemonic = normalize_nfc(mnemonic)
+
+        m = Mnemonic('english')
+
+        if expand:
+            mnemonic = m.expand(mnemonic)
+
+        if not skip_checksum and not m.check(mnemonic):
+            raise Exception("Invalid mnemonic checksum")
 
         if self.features.initialized:
             raise Exception("Device is initialized already. Call wipe_device() and try again.")
